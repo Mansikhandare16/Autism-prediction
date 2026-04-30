@@ -1,10 +1,24 @@
 import streamlit as st
 import pickle
 import numpy as np
+import os
 
 # ---------------- LOAD FILES ----------------
-model = pickle.load(open("best_model.pkl", "rb"))
-encoders = pickle.load(open("encoders.pkl", "rb"))
+
+try:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+    model_path = os.path.join(BASE_DIR, "best_model.pkl")
+    encoder_path = os.path.join(BASE_DIR, "encoders.pkl")
+
+    model = pickle.load(open(model_path, "rb"))
+    encoders = pickle.load(open(encoder_path, "rb"))
+
+    st.success("Model loaded successfully ✅")
+
+except Exception as e:
+    st.error("Model load failed ❌")
+    st.write(e)
 
 st.set_page_config(page_title="Autism Screening Tool", layout="centered")
 
