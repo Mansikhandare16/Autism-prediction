@@ -1,9 +1,13 @@
 import streamlit as st
+import pandas as pd
 import pickle
-import numpy as np
 import os
 
-# ---------------- LOAD FILES ----------------
+st.title("Autism Prediction App")
+
+# ---------------- LOAD MODEL SAFELY ---------------- #
+model = None
+encoders = None
 
 try:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -20,129 +24,71 @@ except Exception as e:
     st.error("Model load failed ❌")
     st.write(e)
 
-st.set_page_config(page_title="Autism Screening Tool", layout="centered")
+# ---------------- STOP IF MODEL NOT LOADED ---------------- #
+if model is None or encoders is None:
+    st.stop()
 
-# ---------------- SIDEBAR ----------------
-st.sidebar.title("About")
-st.sidebar.info("""
-This app uses Machine Learning for early autism screening.
+# ---------------- USER INPUT ---------------- #
 
-⚠️ Not a medical diagnosis.
-Consult a professional for confirmation.
-""")
+st.header("Enter Details")
 
-# ---------------- HEADER ----------------
-st.title("Autism Early Screening Tool")
+# A1–A10 (binary)
+A1 = st.selectbox("A1 Score", [0,1])
+A2 = st.selectbox("A2 Score", [0,1])
+A3 = st.selectbox("A3 Score", [0,1])
+A4 = st.selectbox("A4 Score", [0,1])
+A5 = st.selectbox("A5 Score", [0,1])
+A6 = st.selectbox("A6 Score", [0,1])
+A7 = st.selectbox("A7 Score", [0,1])
+A8 = st.selectbox("A8 Score", [0,1])
+A9 = st.selectbox("A9 Score", [0,1])
+A10 = st.selectbox("A10 Score", [0,1])
 
-st.markdown("""
-This tool helps identify potential autism traits based on behavioral patterns.  
-Please answer honestly for better results.
-""")
+# Age (slider — better UI)
+age = st.slider("Age", 1, 100, 18)
 
-progress = st.progress(0)
+gender = st.selectbox("Gender", encoders["gender"].classes_)
+ethnicity = st.selectbox("Ethnicity", encoders["ethnicity"].classes_)
+jaundice = st.selectbox("Jaundice", encoders["jaundice"].classes_)
+austim = st.selectbox("Family ASD", encoders["austim"].classes_)
+country = st.selectbox("Country", encoders["contry_of_res"].classes_)
+used_app = st.selectbox("Used App Before", encoders["used_app_before"].classes_)
+relation = st.selectbox("Relation", encoders["relation"].classes_)
 
-st.write("---")
+# result score input
+result = st.number_input("Result Score", min_value=0)
 
-# ---------------- PERSONAL INFO ----------------
-with st.expander("Personal Information", expanded=True):
+# ---------------- PREDICT ---------------- #
 
-    age = st.selectbox("Select Age", list(range(1,101)))
-
-    gender = st.selectbox("Gender", ["m", "f"])
-    ethnicity = st.selectbox("Ethnicity", encoders["ethnicity"].classes_)
-    jaundice = st.selectbox("Born with jaundice?", ["yes", "no"])
-    austim = st.selectbox("Family member with autism?", ["yes", "no"])
-    country = st.selectbox("Country", encoders["contry_of_res"].classes_)
-    used_app = st.selectbox("Used app before?", ["yes", "no"])
-    relation = st.selectbox("Relation", encoders["relation"].classes_)
-
-progress.progress(30)
-
-st.write("---")
-
-# ---------------- QUESTIONS ----------------
-with st.expander("Behavioral Questions", expanded=True):
-
-    def yes_no(q):
-        return 1 if st.radio(q, ["Yes", "No"], horizontal=True) == "Yes" else 0
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        a1 = yes_no("Enjoys social interaction?")
-        a3 = yes_no("Responds to name?")
-        a5 = yes_no("Maintains eye contact?")
-        a7 = yes_no("Interested in other children?")
-        a9 = yes_no("Understands instructions?")
-
-    with col2:
-        a2 = yes_no("Prefers to be alone?")
-        a4 = yes_no("Avoids eye contact?")
-        a6 = yes_no("Upset by small changes?")
-        a8 = yes_no("Repeats actions?")
-        a10 = yes_no("Communication difficulty?")
-
-progress.progress(70)
-
-st.write("---")
-
-# ---------------- ENCODING ----------------
-gender = encoders["gender"].transform([gender])[0]
-ethnicity = encoders["ethnicity"].transform([ethnicity])[0]
-jaundice = encoders["jaundice"].transform([jaundice])[0]
-austim = encoders["austim"].transform([austim])[0]
-country = encoders["contry_of_res"].transform([country])[0]
-used_app = encoders["used_app_before"].transform([used_app])[0]
-relation = encoders["relation"].transform([relation])[0]
-
-# ---------------- CALCULATE RESULT ----------------
-result = a1+a2+a3+a4+a5+a6+a7+a8+a9+a10
-
-# ---------------- PREDICTION ----------------
 if st.button("Predict"):
 
-    try:
-        input_data = np.array([[
-            a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,
-            age,
-            gender,
-            ethnicity,
-            jaundice,
-            austim,
-            country,
-            used_app,
-            result,
-            relation
-        ]])
+    input_dict = {
+        "A1_Score": A1,
+        "A2_Score": A2,
+        "A3_Score": A3,
+        "A4_Score": A4,
+        "A5_Score": A5,
+        "A6_Score": A6,
+        "A7_Score": A7,
+        "A8_Score": A8,
+        "A9_Score": A9,
+        "A10_Score": A10,
+        "age": age,
+        "gender": encoders["gender"].transform([gender])[0],
+        "ethnicity": encoders["ethnicity"].transform([ethnicity])[0],
+        "jaundice": encoders["jaundice"].transform([jaundice])[0],
+        "austim": encoders["austim"].transform([austim])[0],
+        "contry_of_res": encoders["contry_of_res"].transform([country])[0],
+        "used_app_before": encoders["used_app_before"].transform([used_app])[0],
+        "relation": encoders["relation"].transform([relation])[0],
+        "result": result
+    }
 
-        prediction = model.predict(input_data)[0]
-        prob = model.predict_proba(input_data)[0][1]
+    input_df = pd.DataFrame([input_dict])
 
-        progress.progress(100)
+    prediction = model.predict(input_df)[0]
 
-        st.markdown("## Result Summary")
-
-        st.write(f"Total Score: {result}/10")
-
-        if prob < 0.3:
-            st.success(f"Low Risk\n\nProbability: {prob*100:.2f}%")
-        elif prob < 0.7:
-            st.warning(f"Medium Risk\n\nProbability: {prob*100:.2f}%")
-        else:
-            st.error(f"High Risk\n\nProbability: {prob*100:.2f}%")
-
-        # ---------------- RECOMMENDATIONS ----------------
-        if prob > 0.7:
-            st.markdown("""
-### Recommendation:
-- Consider consulting a specialist  
-- Early intervention can be very helpful  
-- Monitor behavioral patterns closely  
-""")
-
-    except Exception as e:
-        st.error(f"Error: {e}")
-
-# ---------------- FOOTER ----------------
-st.write("---")
-st.info("⚠️ This is not a medical diagnosis. Please consult a healthcare professional.")
+    if prediction == 1:
+        st.error("High chances of Autism ⚠️")
+    else:
+        st.success("Low chances of Autism ✅")
